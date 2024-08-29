@@ -34,75 +34,7 @@
 
 #include "pico/stdlib.h"
 
-
-#define KB_NUM_OF_KEYS 68
-#define KB_NUM_OF_COLS 15
-#define KB_COL_PIN_0 7
-#define KB_COL_PIN_1 8
-#define KB_COL_PIN_2 9
-#define KB_COL_PIN_3 10
-#define KB_COL_PIN_4 11
-#define KB_COL_PIN_5 12
-#define KB_COL_PIN_6 13
-#define KB_COL_PIN_7 14
-#define KB_COL_PIN_8 15
-#define KB_COL_PIN_9 16
-#define KB_COL_PIN_10 17
-#define KB_COL_PIN_11 18
-#define KB_COL_PIN_12 19
-#define KB_COL_PIN_13 20
-#define KB_COL_PIN_14 21
-#define KB_COL_PINS { \
-    KB_COL_PIN_0, KB_COL_PIN_1, KB_COL_PIN_2, KB_COL_PIN_3, \
-    KB_COL_PIN_4, KB_COL_PIN_5, KB_COL_PIN_6, KB_COL_PIN_7, \
-    KB_COL_PIN_8, KB_COL_PIN_9, KB_COL_PIN_10, KB_COL_PIN_11, \
-    KB_COL_PIN_12, KB_COL_PIN_13, KB_COL_PIN_14 \
-  }\
-
-#define KB_NUM_OF_ROWS 5
-#define KB_ROW_PIN_0 2
-#define KB_ROW_PIN_1 3
-#define KB_ROW_PIN_2 4
-#define KB_ROW_PIN_3 5
-#define KB_ROW_PIN_4 6
-#define KB_ROW_PINS { \
-    KB_ROW_PIN_0, KB_ROW_PIN_1, KB_ROW_PIN_2, KB_ROW_PIN_3, \
-    KB_ROW_PIN_4}\
-
-
-#define KB_KEY_CODES { \
-                    /* ["¬\n`","!\n1","\"\n2","£\n3","$\n4","%\n5","^\n6","&\n7","*\n8","(\n9",")\n0","_\n-","+\n=",{w:2},"Backspace"], */ \
-                    /*0,0*/{HID_KEY_ESCAPE, HID_KEY_1, HID_KEY_2, HID_KEY_3, HID_KEY_4, HID_KEY_5, HID_KEY_6, HID_KEY_7, \
-                     HID_KEY_8, HID_KEY_9, HID_KEY_0, HID_KEY_MINUS, HID_KEY_EQUAL, HID_KEY_BACKSPACE, HID_KEY_GRAVE}, /*0,15*/ \
-                    \
-                    /* [{w:1.5},"Tab","Q","W","E","R","T","Y","U","I","O","P","{\n[","}\n]",{x:0.25,w:1.25,h:2,w2:1.5,h2:1,x2:-0.25},"Enter"], */ \
-                    /*1,0*/{HID_KEY_TAB, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_Y, HID_KEY_U, \
-                     HID_KEY_I, HID_KEY_O, HID_KEY_P, HID_KEY_BRACKET_LEFT, HID_KEY_BRACKET_RIGHT, HID_KEY_BACKSLASH, HID_KEY_PAGE_UP}, /*1,15*/ \
-                    \
-                    /* [{w:1.75},"Caps Lock","A","S","D","F","G","H","J","K","L",":\n;","@\n'","~\n#"],*/ \
-                    /*2,0*/{HID_KEY_CAPS_LOCK, HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_H, HID_KEY_J, \
-                     HID_KEY_K, HID_KEY_L, HID_KEY_SEMICOLON, HID_KEY_APOSTROPHE, HID_KEY_NONE, HID_KEY_ENTER, HID_KEY_PAGE_DOWN}, /*2,15*/ \
-                    \
-                    /* [{w:1.25},"Shift","|\n\\","Z","X","C","V","B","N","M","<\n,",">\n.","?\n/",{w:2.75},"Shift"],*/ \
-                    /*3,0*/{HID_KEY_SHIFT_LEFT, HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, HID_KEY_N, HID_KEY_M, \
-                     HID_KEY_COMMA, HID_KEY_PERIOD, HID_KEY_SLASH, HID_KEY_NONE, HID_KEY_SHIFT_RIGHT, HID_KEY_ARROW_UP, HID_KEY_DELETE}, /*3,15*/ \
-                    \
-                    /* [{w:1.25},"Ctrl",{w:1.25},"Win",{w:1.25},"Alt",{a:7,w:6.25},"",{a:4,w:1.25},"AltGr",{w:1.25},"Win",{w:1.25},"Menu",{w:1.25},"Ctrl"] */ \
-                    /*4,0*/{HID_KEY_CONTROL_LEFT, HID_KEY_GUI_LEFT, HID_KEY_ALT_LEFT, HID_KEY_NONE, HID_KEY_NONE, HID_KEY_SPACE, HID_KEY_NONE, HID_KEY_NONE, \
-                     HID_KEY_NONE, HID_KEY_ALT_RIGHT, HID_KEY_GUI_RIGHT, HID_KEY_CONTROL_RIGHT, HID_KEY_ARROW_LEFT, HID_KEY_ARROW_DOWN, HID_KEY_ARROW_RIGHT} /*4,15*/ \
-                  }
-
-const uint kb_columns[KB_NUM_OF_COLS] = KB_COL_PINS;
-const uint kb_rows[KB_NUM_OF_ROWS] = KB_ROW_PINS;
-const uint kb_key_codes[KB_NUM_OF_ROWS][KB_NUM_OF_COLS] = KB_KEY_CODES;
-
-#define KB_MAX_NUM_OF_KEYCODES (6+8)
-
-typedef struct TU_ATTR_PACKED
-{
-  uint8_t num_of_keycodes;
-  uint8_t keycode[KB_MAX_NUM_OF_KEYCODES]; /**< Key codes of the currently pressed keys. */
-} kb_pressed_keycodes_t;
+#include "main.h"
 
 
 //--------------------------------------------------------------------+
@@ -128,6 +60,8 @@ void hid_task(void);
 void init_kb_matrix(void);
 kb_pressed_keycodes_t get_kb_keycodes(void); 
 void send_hid_report(kb_pressed_keycodes_t kb_status);
+
+kb_report_t parse_kb_report(kb_pressed_keycodes_t kb_status);
 
 /*------------- MAIN -------------*/
 int main(void)
@@ -233,62 +167,104 @@ void tud_resume_cb(void)
 //--------------------------------------------------------------------+
 // USB HID
 //--------------------------------------------------------------------+
-void send_hid_report(kb_pressed_keycodes_t kb_status){
-  // skip if hid is not ready yet
-  if ( !tud_hid_ready() ) return;
-
-  uint8_t modifier = 0;                /**< Keyboard modifier (KEYBOARD_MODIFIER_* masks). */
-  uint8_t keycode[6] = { 0,0,0, 0,0,0 }; /**< Key codes of the currently pressed keys. */
+kb_report_t parse_kb_report(kb_pressed_keycodes_t kb_status){
+  kb_report_t report;
+  memset(&report, 0, sizeof(report));
   uint cur_keycode_idx = 0;
+  uint num_of_parsed_keycodes = 0;
 
   for(uint status_keycode_idx = 0; status_keycode_idx < kb_status.num_of_keycodes; status_keycode_idx++){
     switch(kb_status.keycode[status_keycode_idx]){
       case HID_KEY_CONTROL_LEFT:{
-        modifier = modifier | KEYBOARD_MODIFIER_LEFTCTRL;
+        report.modifier = report.modifier | KEYBOARD_MODIFIER_LEFTCTRL;
         break;
       }
       case HID_KEY_SHIFT_LEFT:{
-        modifier = modifier | KEYBOARD_MODIFIER_LEFTSHIFT;
+        report.modifier = report.modifier | KEYBOARD_MODIFIER_LEFTSHIFT;
         break;
       }
       case HID_KEY_ALT_LEFT:{
-        modifier = modifier | KEYBOARD_MODIFIER_LEFTALT;
+        report.modifier = report.modifier | KEYBOARD_MODIFIER_LEFTALT;
         break;
       }
       case HID_KEY_GUI_LEFT:{
-        modifier = modifier | KEYBOARD_MODIFIER_LEFTGUI;
+        report.modifier = report.modifier | KEYBOARD_MODIFIER_LEFTGUI;
         break;
       }
       case HID_KEY_CONTROL_RIGHT:{
-        modifier = modifier | KEYBOARD_MODIFIER_RIGHTCTRL;
+        report.modifier = report.modifier | KEYBOARD_MODIFIER_RIGHTCTRL;
         break;
       }
       case HID_KEY_SHIFT_RIGHT:{
-        modifier = modifier | KEYBOARD_MODIFIER_RIGHTSHIFT;
+        report.modifier = report.modifier | KEYBOARD_MODIFIER_RIGHTSHIFT;
         break;
       }
       case HID_KEY_ALT_RIGHT:{
-        modifier = modifier | KEYBOARD_MODIFIER_RIGHTALT;
+        report.modifier = report.modifier | KEYBOARD_MODIFIER_RIGHTALT;
         break;
       }
       case HID_KEY_GUI_RIGHT:{
-        modifier = modifier | KEYBOARD_MODIFIER_RIGHTGUI;
+        //report.modifier = report.modifier | KEYBOARD_MODIFIER_RIGHTGUI;
+        report.fn_pressed = 1;
         break;
       }
       default:{
-        keycode[cur_keycode_idx] = kb_status.keycode[status_keycode_idx];
+        report.keycode[cur_keycode_idx] = kb_status.keycode[status_keycode_idx];
         cur_keycode_idx ++;
         break;
       }
     }
   }
 
-  static bool prev_report_is_not_empty = false;
+  num_of_parsed_keycodes = cur_keycode_idx;
 
-  if((kb_status.num_of_keycodes != 0) || prev_report_is_not_empty){
-    tud_hid_keyboard_report(REPORT_ID_KEYBOARD, modifier, keycode);
+  // Parse alternate keycodes
+  if(report.fn_pressed != 0){
+    for(uint keycode_idx=0; keycode_idx<num_of_parsed_keycodes; keycode_idx++){
+      for(uint i=0; i<KB_NUM_OF_KEY_ALTERNATE_KEY_CODE; i++){
+        if(report.keycode[keycode_idx] == kb_alternate_key_codes[i][0]){
+          report.keycode[keycode_idx] = kb_alternate_key_codes[i][1];
+          break;
+        }
+      }
+    }
   }
-  prev_report_is_not_empty = (kb_status.num_of_keycodes != 0);
+
+  // Parse media keycodes
+  if(report.fn_pressed != 0){
+    for(uint keycode_idx=0; keycode_idx<num_of_parsed_keycodes; keycode_idx++){
+      for(uint i=0; i<KB_NUM_OF_MEDIA_KEY_CODE; i++){
+        if(report.keycode[keycode_idx] == kb_media_key_codes[i][0]){
+          report.media_key |= kb_media_key_codes[i][1];
+          break;
+        }
+      }
+    }
+  }
+
+  return report;
+}
+void send_hid_report(kb_pressed_keycodes_t kb_status){
+  // skip if hid is not ready yet
+  if ( !tud_hid_ready() ) return;
+
+  kb_report_t report = parse_kb_report(kb_status);
+
+  static bool prev_media_report_is_not_empty = false;
+  static bool prev_kb_report_is_not_empty = false;
+
+  // Send media report
+  if(((report.fn_pressed != 0) && (report.media_key != 0)) || prev_media_report_is_not_empty){
+    tud_hid_report(REPORT_ID_CONSUMER_CONTROL, &(report.media_key), sizeof(report.media_key));
+  }
+  prev_media_report_is_not_empty = ((report.fn_pressed != 0) && (report.media_key != 0)) ;
+
+  // Send KB report
+  if(((kb_status.num_of_keycodes != 0) && (report.media_key == 0)) || prev_kb_report_is_not_empty){
+    tud_hid_keyboard_report(REPORT_ID_KEYBOARD, report.modifier, report.keycode);
+  }
+  prev_kb_report_is_not_empty = ((kb_status.num_of_keycodes != 0) && (report.media_key == 0));
+  
 }
 
 // static void send_hid_report(uint8_t report_id, uint32_t btn)
