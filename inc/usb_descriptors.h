@@ -1,0 +1,62 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2019 Ha Thach (tinyusb.org)
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+#ifndef USB_DESCRIPTORS_H_
+#define USB_DESCRIPTORS_H_
+
+
+// Consumer Control Report Descriptor Template
+#define MY_TUD_HID_REPORT_DESC_CONSUMER(...) \
+		 HID_USAGE_PAGE ( HID_USAGE_PAGE_CONSUMER ),        /* Usage Page (Consumer)                                                          */\
+		 HID_USAGE      ( HID_USAGE_CONSUMER_CONTROL ),     /* Usage (Consumer Control)                                                       */\
+		 HID_COLLECTION ( HID_COLLECTION_APPLICATION ),     /* Collection (Application)                                                       */\
+         /* Report ID if any */                                                                                \
+         __VA_ARGS__                                                                                           \
+		 HID_USAGE_PAGE ( HID_USAGE_PAGE_CONSUMER ),        /*   Usage Page (Consumer)                                                        */\
+		 HID_LOGICAL_MIN(0x00),                             /*   Logical Minimum (0)                                                          */\
+		 HID_LOGICAL_MAX(0x01),                             /*   Logical Maximum (1)                                                          */\
+		 HID_REPORT_SIZE(0x01),                             /*   Report Size (1)                                                              */\
+		 HID_REPORT_COUNT(0x08),                            /*   Report Count (8)                                                             */\
+		 HID_USAGE(HID_USAGE_CONSUMER_SCAN_NEXT            ),/*   Usage (Scan Next Track)                                                     */\
+		 HID_USAGE(HID_USAGE_CONSUMER_SCAN_PREVIOUS        ),/*   Usage (Scan Previous Track)                                                 */\
+		 HID_USAGE(HID_USAGE_CONSUMER_STOP                 ),/*   Usage (Stop)                                                                */\
+		 HID_USAGE(HID_USAGE_CONSUMER_VOLUME               ),/*   Usage (Eject)                                                               */\
+		 HID_USAGE(HID_USAGE_CONSUMER_PLAY_PAUSE           ),/*   Usage (Play/Pause)                                                          */\
+		 HID_USAGE(HID_USAGE_CONSUMER_MUTE                 ),/*   Usage (Mute)                                                                */\
+		 HID_USAGE(HID_USAGE_CONSUMER_VOLUME_INCREMENT     ),/*   Usage (Volume Increment)                                                    */\
+		 HID_USAGE(HID_USAGE_CONSUMER_VOLUME_DECREMENT     ),/*   Usage (Volume Decrement)                                                    */\
+         /*   Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)        */                                                \
+		 HID_INPUT        ( HID_DATA | HID_VARIABLE | HID_WRAP_NO | HID_LINEAR | HID_PREFERRED_STATE | HID_NO_NULL_POSITION ),                  \
+		 HID_COLLECTION_END,              /* End Collection                                                                                   */\
+
+enum
+{
+  REPORT_ID_KEYBOARD = 1,
+//  REPORT_ID_MOUSE,
+  REPORT_ID_CONSUMER_CONTROL,
+//  REPORT_ID_GAMEPAD,
+  REPORT_ID_COUNT
+};
+
+#endif /* USB_DESCRIPTORS_H_ */
