@@ -32,10 +32,9 @@
 
 #include "usb_descriptors.h"
 
-#include "pico/stdlib.h"
+#include "pico/multicore.h"
 
 #include "main.h"
-
 
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF PROTYPES
@@ -57,25 +56,25 @@ static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 void led_blinking_task(void);
 void hid_task(void);
 
-void init_kb_matrix(void);
-kb_pressed_keycodes_t get_kb_keycodes(void); 
-void send_hid_report(kb_pressed_keycodes_t kb_status);
+void core1_entry();
 
-kb_report_t parse_kb_report(kb_pressed_keycodes_t kb_status);
+kb_pressed_keycodes_t core1_kb_status;
+auto_init_mutex(my_mutex);
 
 /*------------- MAIN -------------*/
 int main(void)
 {
+  init_kb_matrix();
   board_init();
 
   // init device stack on configured roothub port
   tud_init(BOARD_TUD_RHPORT);
 
-  init_kb_matrix();
-
   if (board_init_after_tusb) {
     board_init_after_tusb();
   }
+
+  multicore_launch_core1(core1_entry);
 
   while (1)
   {
@@ -86,53 +85,17 @@ int main(void)
   }
 }
 
-//--------------------------------------------------------------------+
-// Serving keyboard matrix
-//--------------------------------------------------------------------+
 
-void init_kb_matrix(void){
-  for (int col_idx = 0; col_idx < KB_NUM_OF_COLS; col_idx++) {
-    gpio_init(kb_columns[col_idx]);
-    gpio_set_dir(kb_columns[col_idx], GPIO_OUT);
-
-    gpio_put(kb_columns[col_idx], 0);
-  }
-
-  for (int row_idx = 0; row_idx < KB_NUM_OF_ROWS; row_idx++) {
-    gpio_init(kb_rows[row_idx]);
-    gpio_set_dir(kb_rows[row_idx], GPIO_IN);
-  }
-}
-
-kb_pressed_keycodes_t get_kb_keycodes(void){
-  kb_pressed_keycodes_t res;
-  // Clear structure
-  memset(&res, 0, sizeof(res));
-
-  for (int col_idx = 0; col_idx < KB_NUM_OF_COLS; col_idx++) {
-    gpio_put(kb_columns[col_idx], 1);
-    sleep_ms(1);
-    for (int row_idx = 0; row_idx < KB_NUM_OF_ROWS; row_idx++) {
-      if(gpio_get(kb_rows[row_idx])){
-        if(res.num_of_keycodes < KB_MAX_NUM_OF_KEYCODES){
-          uint8_t keycode = kb_key_codes[row_idx][col_idx];
-          if(keycode != HID_KEY_NONE){
-            res.keycode[res.num_of_keycodes] = keycode;
-            res.num_of_keycodes ++;
-          }
-        }
-      }
+void core1_entry(){
+  while(true){
+    uint32_t owner_out;
+    kb_pressed_keycodes_t lcl_kb_status = get_kb_keycodes();
+    if (mutex_try_enter(&my_mutex,&owner_out)){
+      core1_kb_status = lcl_kb_status;
+      mutex_exit(&my_mutex);
     }
-    gpio_put(kb_columns[col_idx], 0);
-    sleep_ms(1);
   }
-
-  return res;
 }
-
-//--------------------------------------------------------------------+
-//--------------------------------------------------------------------+
-
 //--------------------------------------------------------------------+
 // Device callbacks
 //--------------------------------------------------------------------+
@@ -167,91 +130,63 @@ void tud_resume_cb(void)
 //--------------------------------------------------------------------+
 // USB HID
 //--------------------------------------------------------------------+
-kb_report_t parse_kb_report(kb_pressed_keycodes_t kb_status){
-  kb_report_t report;
-  memset(&report, 0, sizeof(report));
-  uint cur_keycode_idx = 0;
-  uint num_of_parsed_keycodes = 0;
 
-  for(uint status_keycode_idx = 0; status_keycode_idx < kb_status.num_of_keycodes; status_keycode_idx++){
-    switch(kb_status.keycode[status_keycode_idx]){
-      case HID_KEY_CONTROL_LEFT:{
-        report.modifier = report.modifier | KEYBOARD_MODIFIER_LEFTCTRL;
-        break;
-      }
-      case HID_KEY_SHIFT_LEFT:{
-        report.modifier = report.modifier | KEYBOARD_MODIFIER_LEFTSHIFT;
-        break;
-      }
-      case HID_KEY_ALT_LEFT:{
-        report.modifier = report.modifier | KEYBOARD_MODIFIER_LEFTALT;
-        break;
-      }
-      case HID_KEY_GUI_LEFT:{
-        report.modifier = report.modifier | KEYBOARD_MODIFIER_LEFTGUI;
-        break;
-      }
-      case HID_KEY_CONTROL_RIGHT:{
-        report.modifier = report.modifier | KEYBOARD_MODIFIER_RIGHTCTRL;
-        break;
-      }
-      case HID_KEY_SHIFT_RIGHT:{
-        report.modifier = report.modifier | KEYBOARD_MODIFIER_RIGHTSHIFT;
-        break;
-      }
-      case HID_KEY_ALT_RIGHT:{
-        report.modifier = report.modifier | KEYBOARD_MODIFIER_RIGHTALT;
-        break;
-      }
-      case HID_KEY_GUI_RIGHT:{
-        //report.modifier = report.modifier | KEYBOARD_MODIFIER_RIGHTGUI;
-        report.fn_pressed = 1;
-        break;
-      }
-      default:{
-        report.keycode[cur_keycode_idx] = kb_status.keycode[status_keycode_idx];
-        cur_keycode_idx ++;
-        break;
-      }
-    }
-  }
+static void send_hid_report(uint8_t report_id, kb_pressed_keycodes_t kb_status)
+{
+  // // skip if hid is not ready yet
+  // if ( !tud_hid_ready() ) return;
 
-  num_of_parsed_keycodes = cur_keycode_idx;
+  // kb_report_t report = parse_kb_report(kb_status);
 
-  // Parse alternate keycodes
-  if(report.fn_pressed != 0){
-    for(uint keycode_idx=0; keycode_idx<num_of_parsed_keycodes; keycode_idx++){
-      for(uint i=0; i<KB_NUM_OF_KEY_ALTERNATE_KEY_CODE; i++){
-        if(report.keycode[keycode_idx] == kb_alternate_key_codes[i][0]){
-          report.keycode[keycode_idx] = kb_alternate_key_codes[i][1];
-          break;
-        }
-      }
-    }
-  }
+  // switch(report_id)
+  // {
+  //   case REPORT_ID_KEYBOARD:
+  //   {
+  //     // use to avoid send multiple consecutive zero report for keyboard
+  //     static bool has_keyboard_key = false;
 
-  // Parse media keycodes
-  if(report.fn_pressed != 0){
-    for(uint keycode_idx=0; keycode_idx<num_of_parsed_keycodes; keycode_idx++){
-      for(uint i=0; i<KB_NUM_OF_MEDIA_KEY_CODE; i++){
-        if(report.keycode[keycode_idx] == kb_media_key_codes[i][0]){
-          report.media_key |= kb_media_key_codes[i][1];
-          break;
-        }
-      }
-    }
-  }
+  //     if((kb_status.num_of_keycodes != 0) && (report.media_key == 0))
+  //     {
+  //       tud_hid_keyboard_report(REPORT_ID_KEYBOARD, report.modifier, report.keycode);
+  //       has_keyboard_key = true;
+  //     }else
+  //     {
+  //       // send empty key report if previously has key pressed
+  //       if (has_keyboard_key) tud_hid_keyboard_report(REPORT_ID_KEYBOARD, 0, NULL);
+  //       has_keyboard_key = false;
+  //     }
+  //   }
+  //   break;
 
-  return report;
-}
-void send_hid_report(kb_pressed_keycodes_t kb_status){
-  // skip if hid is not ready yet
-  if ( !tud_hid_ready() ) return;
+  //   case REPORT_ID_CONSUMER_CONTROL:
+  //   {
+  //     // use to avoid send multiple consecutive zero report
+  //     static bool has_consumer_key = false;
 
-  kb_report_t report = parse_kb_report(kb_status);
+  //     if((report.fn_pressed != 0) && (report.media_key != 0))
+  //     {
+  //       // volume down
+  //       uint16_t volume_down = HID_USAGE_CONSUMER_VOLUME_DECREMENT;
+  //       tud_hid_report(REPORT_ID_CONSUMER_CONTROL, &volume_down, 2);
+  //       has_consumer_key = true;
+  //     }else
+  //     {
+  //       // send empty key report (release key) if previously has key pressed
+  //       uint16_t empty_key = 0;
+  //       if (has_consumer_key) tud_hid_report(REPORT_ID_CONSUMER_CONTROL, &empty_key, 2);
+  //       has_consumer_key = false;
+  //     }
+  //   }
+  //   break;
+
+  //   default: break;
+  // }
 
   static bool prev_media_report_is_not_empty = false;
   static bool prev_kb_report_is_not_empty = false;
+
+  kb_report_t report = parse_kb_report(kb_status);
+
 
   // Send media report
   if(((report.fn_pressed != 0) && (report.media_key != 0)) || prev_media_report_is_not_empty){
@@ -259,103 +194,12 @@ void send_hid_report(kb_pressed_keycodes_t kb_status){
   }
   prev_media_report_is_not_empty = ((report.fn_pressed != 0) && (report.media_key != 0)) ;
 
-  // Send KB report
+  //Send KB report
   if(((kb_status.num_of_keycodes != 0) && (report.media_key == 0)) || prev_kb_report_is_not_empty){
     tud_hid_keyboard_report(REPORT_ID_KEYBOARD, report.modifier, report.keycode);
   }
   prev_kb_report_is_not_empty = ((kb_status.num_of_keycodes != 0) && (report.media_key == 0));
-  
 }
-
-// static void send_hid_report(uint8_t report_id, uint32_t btn)
-// {
-//   // skip if hid is not ready yet
-//   if ( !tud_hid_ready() ) return;
-
-//   switch(report_id)
-//   {
-//     case REPORT_ID_KEYBOARD:
-//     {
-//       // use to avoid send multiple consecutive zero report for keyboard
-//       static bool has_keyboard_key = false;
-
-//       if ( btn )
-//       {
-//         uint8_t keycode[6] = { 0 };
-//         keycode[0] = HID_KEY_A;
-
-//         tud_hid_keyboard_report(REPORT_ID_KEYBOARD, 0, keycode);
-//         has_keyboard_key = true;
-//       }else
-//       {
-//         // send empty key report if previously has key pressed
-//         if (has_keyboard_key) tud_hid_keyboard_report(REPORT_ID_KEYBOARD, 0, NULL);
-//         has_keyboard_key = false;
-//       }
-//     }
-//     break;
-
-//     case REPORT_ID_MOUSE:
-//     {
-//       int8_t const delta = 5;
-
-//       // no button, right + down, no scroll, no pan
-//       tud_hid_mouse_report(REPORT_ID_MOUSE, 0x00, delta, delta, 0, 0);
-//     }
-//     break;
-
-//     case REPORT_ID_CONSUMER_CONTROL:
-//     {
-//       // use to avoid send multiple consecutive zero report
-//       static bool has_consumer_key = false;
-
-//       if ( btn )
-//       {
-//         // volume down
-//         uint16_t volume_down = HID_USAGE_CONSUMER_VOLUME_DECREMENT;
-//         tud_hid_report(REPORT_ID_CONSUMER_CONTROL, &volume_down, 2);
-//         has_consumer_key = true;
-//       }else
-//       {
-//         // send empty key report (release key) if previously has key pressed
-//         uint16_t empty_key = 0;
-//         if (has_consumer_key) tud_hid_report(REPORT_ID_CONSUMER_CONTROL, &empty_key, 2);
-//         has_consumer_key = false;
-//       }
-//     }
-//     break;
-
-//     case REPORT_ID_GAMEPAD:
-//     {
-//       // use to avoid send multiple consecutive zero report for keyboard
-//       static bool has_gamepad_key = false;
-
-//       hid_gamepad_report_t report =
-//       {
-//         .x   = 0, .y = 0, .z = 0, .rz = 0, .rx = 0, .ry = 0,
-//         .hat = 0, .buttons = 0
-//       };
-
-//       if ( btn )
-//       {
-//         report.hat = GAMEPAD_HAT_UP;
-//         report.buttons = GAMEPAD_BUTTON_A;
-//         tud_hid_report(REPORT_ID_GAMEPAD, &report, sizeof(report));
-
-//         has_gamepad_key = true;
-//       }else
-//       {
-//         report.hat = GAMEPAD_HAT_CENTERED;
-//         report.buttons = 0;
-//         if (has_gamepad_key) tud_hid_report(REPORT_ID_GAMEPAD, &report, sizeof(report));
-//         has_gamepad_key = false;
-//       }
-//     }
-//     break;
-
-//     default: break;
-//   }
-// }
 
 // Every 10ms, we will sent 1 report for each HID profile (keyboard, mouse etc ..)
 // tud_hid_report_complete_cb() is used to send the next report after previous one is complete
@@ -368,22 +212,26 @@ void hid_task(void)
   if ( board_millis() - start_ms < interval_ms) return; // not enough time
   start_ms += interval_ms;
 
-  kb_pressed_keycodes_t kb_status = get_kb_keycodes();
-  send_hid_report(kb_status);
-
   //uint32_t const btn = board_button_read();
-  //
-  // // Remote wakeup
-  // if ( tud_suspended() && btn )
-  // {
-  //   // Wake up host if we are in suspend mode
-  //   // and REMOTE_WAKEUP feature is enabled by host
-  //   tud_remote_wakeup();
-  // }else
-  // {
-  //   // Send the 1st of report chain, the rest will be sent by tud_hid_report_complete_cb()
-  //   send_hid_report(REPORT_ID_KEYBOARD, btn);
-  // }
+  kb_pressed_keycodes_t kb_status;
+  uint32_t owner_out;
+  if (mutex_try_enter(&my_mutex,&owner_out)){
+    kb_status = core1_kb_status;
+    mutex_exit(&my_mutex);
+  }
+
+  // Remote wakeup
+  //if ( tud_suspended() && btn )
+  if ( tud_suspended() &&  (kb_status.num_of_keycodes != 0))
+  {
+    // Wake up host if we are in suspend mode
+    // and REMOTE_WAKEUP feature is enabled by host
+    tud_remote_wakeup();
+  }else
+  {
+    // Send the 1st of report chain, the rest will be sent by tud_hid_report_complete_cb()
+    send_hid_report(REPORT_ID_KEYBOARD, kb_status);
+  }
 }
 
 // Invoked when sent REPORT successfully to host
@@ -394,11 +242,17 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, uint16_
   (void) instance;
   (void) len;
 
-  // uint8_t next_report_id = report[0] + 1u;
+  uint8_t next_report_id = report[0] + 1u;
 
   // if (next_report_id < REPORT_ID_COUNT)
   // {
-  //   send_hid_report(next_report_id, board_button_read());
+  //   kb_pressed_keycodes_t kb_status;
+  //   uint32_t owner_out;
+  //   if (mutex_try_enter(&my_mutex,&owner_out)){
+  //     kb_status = core1_kb_status;
+  //     mutex_exit(&my_mutex);
+  //   }
+  //   send_hid_report(next_report_id, kb_status);
   // }
 }
 
@@ -423,29 +277,29 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
 {
   (void) instance;
 
-  // if (report_type == HID_REPORT_TYPE_OUTPUT)
-  // {
-  //   // Set keyboard LED e.g Capslock, Numlock etc...
-  //   if (report_id == REPORT_ID_KEYBOARD)
-  //   {
-  //     // bufsize should be (at least) 1
-  //     if ( bufsize < 1 ) return;
+  if (report_type == HID_REPORT_TYPE_OUTPUT)
+  {
+    // Set keyboard LED e.g Capslock, Numlock etc...
+    if (report_id == REPORT_ID_KEYBOARD)
+    {
+      // bufsize should be (at least) 1
+      if ( bufsize < 1 ) return;
 
-  //     uint8_t const kbd_leds = buffer[0];
+      uint8_t const kbd_leds = buffer[0];
 
-  //     if (kbd_leds & KEYBOARD_LED_CAPSLOCK)
-  //     {
-  //       // Capslock On: disable blink, turn led on
-  //       blink_interval_ms = 0;
-  //       board_led_write(true);
-  //     }else
-  //     {
-  //       // Caplocks Off: back to normal blink
-  //       board_led_write(false);
-  //       blink_interval_ms = BLINK_MOUNTED;
-  //     }
-  //   }
-  // }
+      if (kbd_leds & KEYBOARD_LED_CAPSLOCK)
+      {
+        // Capslock On: disable blink, turn led on
+        blink_interval_ms = 0;
+        board_led_write(true);
+      }else
+      {
+        // Caplocks Off: back to normal blink
+        board_led_write(false);
+        blink_interval_ms = BLINK_MOUNTED;
+      }
+    }
+  }
 }
 
 //--------------------------------------------------------------------+

@@ -51,6 +51,7 @@ pico_sdk_init()
 add_executable(rpi_usb_keyboard 
               ./src/main.c
               ./src/usb_descriptors.c
+              ./src/kb_matrix.c
               )
 
 pico_set_program_name(rpi_usb_keyboard "rpi_usb_keyboard")
@@ -62,7 +63,7 @@ pico_enable_stdio_usb(rpi_usb_keyboard 0)
 
 # Add the standard library to the build
 target_link_libraries(rpi_usb_keyboard
-        PRIVATE tinyusb_device tinyusb_board pico_stdlib)
+        PRIVATE tinyusb_device tinyusb_board pico_stdlib pico_multicore)
 
 # Add the standard include files to the build
 target_include_directories(rpi_usb_keyboard PRIVATE
